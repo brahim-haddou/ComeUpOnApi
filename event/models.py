@@ -25,8 +25,11 @@ class Profile(models.Model):
 
 
 class Follower(models.Model):
-    user_id = models.ForeignKey("Profile", related_name="following", on_delete=models.CASCADE)
-    following_user_id = models.ForeignKey("Profile", related_name="followers", on_delete=models.CASCADE)
+    user_id = models.OneToOneField("Profile", related_name="following", on_delete=models.CASCADE)
+    followers = models.ManyToManyField("Profile", related_name="followers")
+
+    def __str__(self):
+        return self.user_id.user.username + " Followers"
 
 
 class Activity(models.Model):
