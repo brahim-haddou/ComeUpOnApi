@@ -8,7 +8,7 @@ urlpatterns = [
     path('Profile/', profile),  # get all profiles, post add profile
     path('Profile/<int:ID>/', profile_details),  # get, put, delete
     
-    path('Profile/<int:id_user>/Follower/', follower),  # get followers, post follow, delete unfollow
+    path('Profile/<int:id_user>/Followers/', follower),  # get followers, post follow, delete unfollow
     path('Profile/<int:id_user>/Following/', following),  # get following
     
     path('Activity/', activity),
@@ -22,7 +22,4 @@ urlpatterns = [
     
     path('Message/', message),
     path('Message/<int:ID>/', message_details),
-    
-    path('ActivityEvent/', activityEvent),
-    path('ActivityEvent/<int:ID>/', activityEvent_details),
 ]

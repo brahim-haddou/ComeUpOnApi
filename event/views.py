@@ -1,10 +1,11 @@
 from pprint import pprint
 
-from django.contrib.postgres.aggregates import ArrayAgg
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.parsers import JSONParser
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 from event.serializers import *
 from event.models import *
@@ -86,26 +87,33 @@ def profile_details(request, ID):
 
 @csrf_exempt
 def follower(request, id_user):
-    try:
-        instance = Follower.objects.get(user_id=id_user)
-    except Follower.DoesNotExist as e:
-        return JsonResponse({"error": "Given Place object not found."}, status=404)
-    
     if request.method == "GET":
         data = Follower.objects.filter(followers__id=id_user).only('user_id')
         data = Profile.objects.filter(pk__in=data.values_list('id', flat=True))
         serializer = ProfileSerializer(data, many=True)
         return JsonResponse(serializer.data, safe=False)
+    elif request.method == "PUT":
+        try:
+            instance = Follower.objects.get(user_id=id_user)
+        except Follower.DoesNotExist as e:
+            return JsonResponse({"error": "Given Place object not found."}, status=404)
+        data = JSONParser().parse(request)
+        serializer = FollowerSerializer(instance, data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=200)
+        return JsonResponse(serializer.errors, status=400)
     elif request.method == "POST":
         data = JSONParser().parse(request)
-        instance.followers.add(data['user'])
-        serializer = FollowerSerializer(instance)
-        return JsonResponse(serializer.data, status=200)
+        serializer = FollowerSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
     elif request.method == "DELETE":
-        data = JSONParser().parse(request)
-        instance.followers.remove(data['user'])
-        serializer = FollowerSerializer(instance)
-        return JsonResponse(serializer.data, status=200)
+        data = Follower.objects.all()
+        serializer = FollowerSerializer(data, many=True)
+        return JsonResponse(serializer.data, safe=False)
 
 
 @csrf_exempt
@@ -260,43 +268,6 @@ def message_details(request, ID):
             serializer.save()
             return JsonResponse(serializer.data, status=200)
         return JsonResponse(serializer.erros, status=400)
-    elif request.method == "DELETE":
-        instance.delete()
-        return JsonResponse(status=204)
-
-
-@csrf_exempt
-def activityEvent(request):
-    if request.method == "GET":
-        data = ActivityEvent.objects.all()
-        serializer = ActivityEventSerializer(data, many=True)
-        return JsonResponse(serializer.data, safe=False)
-    elif request.method == "POST":
-        data = JSONParser().parse(request)
-        serializer = ActivityEventSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=201)
-        return JsonResponse(serializer.errors, status=400)
-
-
-@csrf_exempt
-def activityEvent_details(request, ID):
-    try:
-        instance = ActivityEvent.objects.get(id=ID)
-    except ActivityEvent.DoesNotExist as e:
-        return JsonResponse({"error": "Given Place object not found."}, status=404)
-    
-    if request.method == "GET":
-        serializer = ActivityEventSerializer(instance)
-        return JsonResponse(serializer.data)
-    elif request.method == "PUT":
-        data = JSONParser().parse(request)
-        serializer = ActivityEventSerializer(instance, data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=200)
-        return JsonResponse(serializer.errors, status=400)
     elif request.method == "DELETE":
         instance.delete()
         return JsonResponse(status=204)

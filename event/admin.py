@@ -1,6 +1,5 @@
 from django.contrib import admin
-from event.models import (Place, Profile, Follower, Activity,
-                          Event, Participant, Message, ActivityEvent)
+from event.models import *
 
 # Register your models here.
 admin.site.register(Place)
@@ -10,4 +9,3 @@ admin.site.register(Activity)
 admin.site.register(Event)
 admin.site.register(Participant)
 admin.site.register(Message)
-admin.site.register(ActivityEvent)

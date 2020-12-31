@@ -9,13 +9,14 @@ class Place(models.Model):
     country = models.CharField(max_length=100)
     lat = models.FloatField()
     lan = models.FloatField()
-    
+
     def __str__(self):
         return self.address
 
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to="images/profile/")
     phone = PhoneNumberField(null=False, blank=False, unique=True)
     birthday = models.DateField(auto_now=False, auto_now_add=False)
     address = models.ForeignKey(Place, on_delete=models.CASCADE)
@@ -29,13 +30,16 @@ class Follower(models.Model):
     followers = models.ManyToManyField("Profile", related_name="followers")
 
     def __str__(self):
-        return self.user_id.user.username + " Followers"
+        return self.user_id.user.username + " following"
 
 
 class Activity(models.Model):
     name = models.CharField(max_length=80)
     category = models.CharField(max_length=80)
-    
+    image = models.ImageField(upload_to="images/activity/")
+    number_Activity = models.PositiveIntegerField()
+    number_Participant = models.PositiveIntegerField()
+
     def __str__(self):
         return self.name
 
@@ -43,10 +47,12 @@ class Activity(models.Model):
 class Event(models.Model):
     owner = models.ForeignKey("Profile", related_name="owner", on_delete=models.CASCADE)
     title = models.CharField(max_length=50)
+    image = models.ImageField(upload_to="images/event/")
     description = models.CharField(max_length=300)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    place_event = models.ForeignKey("Place", on_delete=models.CASCADE)
+    place_event = models.OneToOneField("Place", on_delete=models.CASCADE)
+    activityEvent = models.ManyToManyField("Activity", related_name="activityEvent")
     
     def __str__(self):
         return self.title
@@ -63,10 +69,3 @@ class Message(models.Model):
     user_Message_id = models.ForeignKey("Profile", on_delete=models.CASCADE)
     text = models.CharField(max_length=200)
     time = models.DateTimeField()
-
-
-class ActivityEvent(models.Model):
-    event_Activity_id = models.ForeignKey("Event", on_delete=models.CASCADE)
-    activity_Event_id = models.ForeignKey("Activity", on_delete=models.CASCADE)
-    number_Activity = models.PositiveIntegerField()
-    number_Participant = models.PositiveIntegerField()

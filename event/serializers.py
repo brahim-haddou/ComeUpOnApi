@@ -1,7 +1,5 @@
 from rest_framework import serializers
-from event.models import (Place, Profile, Follower, Activity,
-                          Event, Participant, Message, ActivityEvent)
-
+from event.models import *
 
 class PlaceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -42,10 +40,4 @@ class ParticipantSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = '__all__'
-
-
-class ActivityEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ActivityEvent
         fields = '__all__'
