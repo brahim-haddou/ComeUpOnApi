@@ -26,9 +26,12 @@ MEDIA_URL = "/media/"
 SECRET_KEY = 'p$uriw$t+qw6*=ajb!s^-z$xbjnal_crt2xa7&0=m_bt56f(-y'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'comeupon-api.herokuapp.com',
+    '127.0.0.1'
+]
 
 # Application definition
 

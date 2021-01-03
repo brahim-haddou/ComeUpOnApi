@@ -1,0 +1,1 @@
+web: gunicorn ComeUpOn.wsgi --log-file -
