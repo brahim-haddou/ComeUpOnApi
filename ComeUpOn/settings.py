@@ -27,7 +27,7 @@ SECRET_KEY = 'p$uriw$t+qw6*=ajb!s^-z$xbjnal_crt2xa7&0=m_bt56f(-y'
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    'comeupon-api.herokuapp.com',
+    '',
     '127.0.0.1'
 ]
 
@@ -122,9 +122,5 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
-
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATIC_URL = '/static/'
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "files")
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
