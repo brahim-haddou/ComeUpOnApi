@@ -28,7 +28,10 @@ SECRET_KEY = 'p$uriw$t+qw6*=ajb!s^-z$xbjnal_crt2xa7&0=m_bt56f(-y'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '192.168.1.7',
+    '127.0.0.1'
+]
 
 # Application definition
 
@@ -121,3 +124,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+    )
+}

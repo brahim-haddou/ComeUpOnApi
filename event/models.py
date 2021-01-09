@@ -51,7 +51,7 @@ class Event(models.Model):
     description = models.CharField(max_length=300)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    place_event = models.OneToOneField("Place", on_delete=models.CASCADE)
+    place_event = models.ForeignKey("Place", on_delete=models.CASCADE)
     activityEvent = models.ManyToManyField("Activity", related_name="activityEvent")
     
     def __str__(self):
