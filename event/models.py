@@ -27,10 +27,10 @@ class Profile(models.Model):
 
 class Follower(models.Model):
     user_id = models.OneToOneField("Profile", related_name="following", on_delete=models.CASCADE)
-    followers = models.ManyToManyField("Profile", related_name="followers")
+    follow = models.ManyToManyField("Profile", related_name="followers")
 
     def __str__(self):
-        return self.user_id.user.username + " following"
+        return self.user_id.user.username + " follow"
 
 
 class Activity(models.Model):

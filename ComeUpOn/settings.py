@@ -29,8 +29,9 @@ SECRET_KEY = 'p$uriw$t+qw6*=ajb!s^-z$xbjnal_crt2xa7&0=m_bt56f(-y'
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    '192.168.1.7',
-    '127.0.0.1'
+    '192.168.1.4',
+    '127.0.0.1',
+    'localhost'
 ]
 
 # Application definition
@@ -43,11 +44,33 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'dj_rest_auth.registration',
+    
     'rest_framework',
+    'rest_framework.authtoken',
+    
+    'dj_rest_auth',
     
     'event',
-
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'oauth2_provider.contrib.rest_framework.TokenAuthentication',
+    ]
+}
+
+SITE_ID = 1
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True  # E-mail address is automatically confirmed by a GET request
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Allow logins with an unverified e-mail address
+
+REST_AUTH_REGISTER_SERIALIZERS = {
+        'REGISTER_SERIALIZER': 'event.serializers.RegisterSerializer',
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

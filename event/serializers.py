@@ -1,12 +1,55 @@
-from pprint import pprint
-
-from django.contrib.auth.validators import UnicodeUsernameValidator
+from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
+
 from event.models import *
 
-from drf_extra_fields.fields import Base64ImageField
+from allauth.account import app_settings as allauth_settings
+from allauth.utils import email_address_exists
+from allauth.account.adapter import get_adapter
+from allauth.account.utils import setup_user_email
 
-from django.contrib.auth.models import User
+
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=allauth_settings.EMAIL_REQUIRED)
+    username = serializers.CharField(required=True, write_only=True)
+    first_name = serializers.CharField(required=True, write_only=True)
+    last_name = serializers.CharField(required=True, write_only=True)
+    password1 = serializers.CharField(required=True, write_only=True)
+    password2 = serializers.CharField(required=True, write_only=True)
+    
+    def validate_email(self, email):
+        email = get_adapter().clean_email(email)
+        if allauth_settings.UNIQUE_EMAIL:
+            if email and email_address_exists(email):
+                raise serializers.ValidationError("A user is already registered with this e-mail address.")
+        return email
+    
+    def validate_password1(self, password):
+        return get_adapter().clean_password(password)
+    
+    def validate(self, data):
+        if data['password1'] != data['password2']:
+            raise serializers.ValidationError(
+                _("The two password fields didn't match."))
+        return data
+    
+    def get_cleaned_data(self):
+        return {
+            'first_name': self.validated_data.get('first_name', ''),
+            'last_name': self.validated_data.get('last_name', ''),
+            'username': self.validated_data.get('username', ''),
+            'password1': self.validated_data.get('password1', ''),
+            'email': self.validated_data.get('email', ''),
+        }
+    
+    def save(self, request):
+        adapter = get_adapter()
+        user = adapter.new_user(request)
+        self.cleaned_data = self.get_cleaned_data()
+        adapter.save_user(request, user, self)
+        setup_user_email(request, user, [])
+        user.save()
+        return user
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
@@ -22,12 +65,24 @@ class PlaceSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
-    address = PlaceSerializer(read_only=True)
+    image = Base64ImageField()
+    address = PlaceSerializer()
     user = CurrentUserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), source='user', write_only=True)
     
     class Meta:
         model = Profile
         fields = '__all__'
+
+    def create(self, validated_data):
+        image = validated_data.pop('image')
+        address = validated_data.pop("address")
+    
+        place = Place.objects.create(**address)
+    
+        profile = Profile.objects.create(image=image, address=place, **validated_data)
+        return profile
 
 
 class FollowerSerializer(serializers.ModelSerializer):
@@ -71,10 +126,10 @@ class EventSerializer(serializers.ModelSerializer):
         activities = []
         for activity in activityEvent:
             activities.append(Activity.objects.create(**activity))
-
-        event = Event.objects.create(image=image, place_event=place,  **validated_data)
+        
+        event = Event.objects.create(image=image, place_event=place, **validated_data)
         event.activityEvent.add(*activities)
-      
+        
         return event
 
 

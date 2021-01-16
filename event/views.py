@@ -1,24 +1,27 @@
 from pprint import pprint
 
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from pip._vendor.six import BytesIO
+from rest_auth.registration.serializers import SocialLoginSerializer
 from rest_framework import status
 
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication, TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_jwt.authentication import JSONWebTokenAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from event.serializers import *
 from event.models import *
 
+from django.db.models import Q
+
 
 class PlaceView(APIView):
     parser_classes = (JSONParser, FormParser, MultiPartParser)
     
-    def get(self, request, *args, **kwargs):
+    def get(self):
         data = Place.objects.all()
         serializer = PlaceSerializer(data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -66,8 +69,28 @@ def profile(request):
             data = Profile.objects.filter(pk__in=ids)
             serializer = ProfileSerializer(data, many=True)
             return JsonResponse(serializer.data, safe=False)
+    
     elif request.method == "POST":
         data = JSONParser().parse(request)
+        serializer = ProfileSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
+
+
+class ProfileView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        data = Profile.objects.get(user=request.user.id)
+        serializer = ProfileSerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        data = JSONParser().parse(request)
+        data["user_id"] = request.user.id
         serializer = ProfileSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -100,7 +123,7 @@ def profile_details(request, ID):
 @csrf_exempt
 def follower(request, id_user):
     if request.method == "GET":
-        data = Follower.objects.filter(followers__id=id_user).only('user_id')
+        data = Follower.objects.filter(follow__id=id_user).only('user_id')
         data = Profile.objects.filter(pk__in=data.values_list('id', flat=True))
         serializer = ProfileSerializer(data, many=True)
         return JsonResponse(serializer.data, safe=False)
@@ -129,10 +152,10 @@ def follower(request, id_user):
 
 
 @csrf_exempt
-def following(request, id_user):
+def follow(request, id_user):
     if request.method == "GET":
         data = Follower.objects.all().filter(user_id=id_user)
-        data = Profile.objects.filter(pk__in=data.values_list('followers__id', flat=True))
+        data = Profile.objects.filter(pk__in=data.values_list('follow__id', flat=True))
         serializer = ProfileSerializer(data, many=True)
         return JsonResponse(serializer.data, safe=False)
 
@@ -153,19 +176,6 @@ class ActivityView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    # if request.method == "GET":
-    #     data = Activity.objects.all()
-    #     serializer = ActivitySerializer(data, many=True)
-    #     return JsonResponse(serializer.data, safe=False)
-    # elif request.method == "POST":
-    #     pprint(request.body.encode('utf-8').strip())
-    #     data = JSONParser().parse(request)
-    #     serializer = ActivitySerializer(data=data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return JsonResponse(serializer.data, status=201)
-    #     return JsonResponse(serializer.errors, status=400)
 
 
 @csrf_exempt
@@ -190,41 +200,25 @@ def activity_details(request, ID):
         return JsonResponse(status=204)
 
 
-# @csrf_exempt
-# def event(request):
-# if request.method == "GET":
-#     data = Event.objects.all()
-#     serializer = EventSerializer(data, many=True)
-#     return JsonResponse(serializer.data, safe=False)
-
-# elif request.method == "POST":
-#     import base64
-#     encoded = base64.b64encode(request.body)
-#     data = JSONParser().parse(encoded)
-#     pprint(data)
-#     serializer = EventSerializer(data=data)
-#     if serializer.is_valid():
-#         serializer.save()
-#         return JsonResponse(serializer.data, status=201)
-#     return JsonResponse(serializer.errors, status=400)
-
-
 class EventView(APIView):
     parser_classes = (JSONParser, FormParser, MultiPartParser)
     
-    def get(self, request, *args, **kwargs):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
         data = Event.objects.all()
         serializer = EventSerializer(data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    def post(self, request, *args, **kwargs):
-        serializer = EventSerializer(data=request.data)
+    def post(self, request):
+        data = JSONParser().parse(request)
+        data["owner_id"] = Profile.objects.get(user=request.user.id).id
+        serializer = EventSerializer(data=data)
         if serializer.is_valid():
-            print("------------------------------")
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
-            print("******************************")
             pprint(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -252,12 +246,14 @@ def event_details(request, ID):
 
 
 @csrf_exempt
-def participant(request, event_id):
+def participant(request, event_id, state):
     if request.method == "GET":
-        data = Participant.objects.filter(event_participant_id_id=event_id).only('user_participant_id')
-        data = Profile.objects.filter(pk__in=data)
+        data = Participant.objects.filter(Q(event_participant_id_id=event_id) & Q(stat=state)) \
+            .only('user_participant_id')
+        data = Profile.objects.filter(pk__in=data.values_list('user_participant_id', flat=True))
         serializer = ProfileSerializer(data, many=True)
-        return JsonResponse(serializer.data, safe=False)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
     elif request.method == "POST":
         data = JSONParser().parse(request)
         serializer = ParticipantSerializer(data=data)
@@ -267,60 +263,99 @@ def participant(request, event_id):
         return JsonResponse(serializer.errors, status=400)
 
 
-@csrf_exempt
-def participant_details(request, ID):
-    try:
-        instance = Participant.objects.get(id=ID)
-    except Participant.DoesNotExist as e:
-        return JsonResponse({"error": "Given Place object not found."}, status=404)
+class ParticipantView(APIView):
     
-    if request.method == "GET":
-        serializer = ParticipantSerializer(instance)
-        return JsonResponse(serializer.data)
-    elif request.method == "PUT":
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        event_id = kwargs["event_id"]
+        state = kwargs["state"]
+        
+        data = Participant.objects.filter(Q(event_participant_id_id=event_id) & Q(stat=state)) \
+            .only('user_participant_id')
+        data = Profile.objects.filter(pk__in=data.values_list('user_participant_id', flat=True))
+        serializer = ProfileSerializer(data, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request, *args, **kwargs):
+        data = JSONParser().parse(request)
+        serializer = ParticipantSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
+    
+    def put(self, request, *args, **kwargs):
+        event_id = kwargs["event_id"]
+        user_id = kwargs["state"]
+        try:
+            instance = Participant.objects.get(Q(event_participant_id_id=event_id) & Q(user_participant_id_id=user_id))
+        except Participant.DoesNotExist as e:
+            return JsonResponse({"error": "Given Place object not found."}, status=404)
         data = JSONParser().parse(request)
         serializer = ParticipantSerializer(instance, data=data)
         if serializer.is_valid():
             serializer.save()
             return JsonResponse(serializer.data, status=200)
         return JsonResponse(serializer.errors, status=400)
-    elif request.method == "DELETE":
-        instance.delete()
-        return JsonResponse(status=204)
-
-
-@csrf_exempt
-def message(request):
-    if request.method == "GET":
-        data = Message.objects.all()
-        serializer = MessageSerializer(data, many=True)
-        return JsonResponse(serializer.data, safe=False)
-    elif request.method == "POST":
-        data = JSONParser().parse(request)
-        serializer = MessageSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=201)
-        return JsonResponse(serializer.errors, status=400)
-
-
-@csrf_exempt
-def message_details(request, ID):
-    try:
-        instance = Message.objects.get(id=ID)
-    except Message.DoesNotExist as e:
-        return JsonResponse({"error": "Given Place object not found."}, status=404)
     
-    if request.method == "GET":
-        serializer = MessageSerializer(instance)
-        return JsonResponse(serializer.data)
-    elif request.method == "PUT":
-        data = JSONParser().parse(request)
-        serializer = MessageSerializer(instance, data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return JsonResponse(serializer.data, status=200)
-        return JsonResponse(serializer.erros, status=400)
-    elif request.method == "DELETE":
-        instance.delete()
-        return JsonResponse(status=204)
+    
+
+# @csrf_exempt
+# def participant_details(request, ID):
+#     try:
+#         instance = Participant.objects.get(id=ID)
+#     except Participant.DoesNotExist as e:
+#         return JsonResponse({"error": "Given Place object not found."}, status=404)
+#
+#     if request.method == "GET":
+#         serializer = ParticipantSerializer(instance)
+#         return JsonResponse(serializer.data)
+#     elif request.method == "PUT":
+#         data = JSONParser().parse(request)
+#         serializer = ParticipantSerializer(instance, data=data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return JsonResponse(serializer.data, status=200)
+#         return JsonResponse(serializer.errors, status=400)
+#     elif request.method == "DELETE":
+#         instance.delete()
+#         return JsonResponse(status=204)
+
+
+# @csrf_exempt
+# def message(request):
+#     if request.method == "GET":
+#         data = Message.objects.all()
+#         serializer = MessageSerializer(data, many=True)
+#         return JsonResponse(serializer.data, safe=False)
+#     elif request.method == "POST":
+#         data = JSONParser().parse(request)
+#         serializer = MessageSerializer(data=data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return JsonResponse(serializer.data, status=201)
+#         return JsonResponse(serializer.errors, status=400)
+#
+#
+# @csrf_exempt
+# def message_details(request, ID):
+#     try:
+#         instance = Message.objects.get(id=ID)
+#     except Message.DoesNotExist as e:
+#         return JsonResponse({"error": "Given Place object not found."}, status=404)
+#
+#     if request.method == "GET":
+#         serializer = MessageSerializer(instance)
+#         return JsonResponse(serializer.data)
+#     elif request.method == "PUT":
+#         data = JSONParser().parse(request)
+#         serializer = MessageSerializer(instance, data=data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return JsonResponse(serializer.data, status=200)
+#         return JsonResponse(serializer.erros, status=400)
+#     elif request.method == "DELETE":
+#         instance.delete()
+#         return JsonResponse(status=204)
