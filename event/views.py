@@ -160,8 +160,104 @@ def follow(request, id_user):
         return JsonResponse(serializer.data, safe=False)
 
 
+class MeFollowingView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        profile = Profile.objects.get(user_id=request.user.id)
+        data = Follower.objects.filter(user_id=profile.id)
+        data = Profile.objects.filter(pk__in=data.values_list('follow__id', flat=True))
+        serializer = ProfileSerializer(data, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+
+class MyFollowersView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        profile = Profile.objects.get(user_id=request.user.id)
+        data = Follower.objects.filter(follow__id=profile.id)
+        data = Profile.objects.filter(pk__in=data.values_list('user_id', flat=True))
+        pprint(data)
+        serializer = ProfileSerializer(data, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+
+class FollowParticipantView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        profile_id = kwargs["profile_id"]
+        data_follow = Follower.objects.get(user_id=profile_id)
+        follow_num = len(data_follow.follow.all())
+        
+        data_follower = Follower.objects.filter(follow__id=profile_id)
+        follower_num = len(data_follower)
+        
+        d = {
+            "follow": follow_num,
+            "follower": follower_num
+        }
+        return JsonResponse(d, safe=False)
+
+
+class AmIFollowingView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        
+        profile_id = kwargs["profile_id"]
+        
+        profile = Profile.objects.get(id=profile_id)
+        pprint(profile)
+        my_profile = Profile.objects.get(user_id=request.user.id)
+        pprint(my_profile)
+        data_follow = Follower.objects.get(user_id=my_profile.id)
+        pprint(data_follow)
+        pprint(data_follow.follow.all())
+        if profile in data_follow.follow.all():
+            d = {
+                "Bool": True
+            }
+            return JsonResponse(d, safe=False)
+        else:
+            d = {
+                "Bool": False
+            }
+            return JsonResponse(d, safe=False)
+        
+    def post(self, request, *args, **kwargs):
+        profile_id = kwargs["profile_id"]
+        profile = Profile.objects.get(id=profile_id)
+        my_profile = Profile.objects.get(user_id=request.user.id)
+        data_follow = Follower.objects.get(user_id=my_profile.id)
+        data_follow.follow.add(profile)
+        d = {
+            "Bool": True
+        }
+        return JsonResponse(d, safe=False)
+    
+    def put(self, request, *args, **kwargs):
+        profile_id = kwargs["profile_id"]
+        profile = Profile.objects.get(id=profile_id)
+        my_profile = Profile.objects.get(user_id=request.user.id)
+        data_follow = Follower.objects.get(user_id=my_profile.id)
+        data_follow.follow.remove(profile)
+        d = {
+            "Bool": True
+        }
+        return JsonResponse(d, safe=False)
+
+
 class ActivityView(APIView):
     parser_classes = (JSONParser, FormParser, MultiPartParser)
+    
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, *args, **kwargs):
         data = Activity.objects.all()
@@ -264,7 +360,6 @@ def participant(request, event_id, state):
 
 
 class ParticipantView(APIView):
-    
     authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
     permission_classes = [IsAuthenticated]
     
@@ -279,7 +374,12 @@ class ParticipantView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def post(self, request, *args, **kwargs):
-        data = JSONParser().parse(request)
+        data = {
+            "event_participant_id": kwargs["event_id"],
+            "user_participant_id": Profile.objects.get(user_id=request.user.id).id,
+            "stat": 0
+        }
+        # data = JSONParser().parse(data)
         serializer = ParticipantSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -299,8 +399,24 @@ class ParticipantView(APIView):
             serializer.save()
             return JsonResponse(serializer.data, status=200)
         return JsonResponse(serializer.errors, status=400)
+
+
+class ParticipantStateView(APIView):
+    authentication_classes = [TokenAuthentication, SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
     
-    
+    def get(self, request, *args, **kwargs):
+        event_id = kwargs["event_id"]
+        user_id = Profile.objects.get(user_id=request.user.id).id
+        try:
+            data = Participant.objects.get(Q(event_participant_id_id=event_id) & Q(user_participant_id_id=user_id))
+            
+            pprint(data)
+        except Participant.DoesNotExist as e:
+            return Response("DoesNotExist", status=status.HTTP_404_NOT_FOUND)
+        serializer = ParticipantSerializer(data)
+        pprint(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # @csrf_exempt
 # def participant_details(request, ID):
