@@ -304,6 +304,7 @@ class EventView(APIView):
     
     def get(self, request):
         data = Event.objects.all()
+        data = data[::-1]
         serializer = EventSerializer(data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -379,7 +380,6 @@ class ParticipantView(APIView):
             "user_participant_id": Profile.objects.get(user_id=request.user.id).id,
             "stat": 0
         }
-        # data = JSONParser().parse(data)
         serializer = ParticipantSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -410,7 +410,6 @@ class ParticipantStateView(APIView):
         user_id = Profile.objects.get(user_id=request.user.id).id
         try:
             data = Participant.objects.get(Q(event_participant_id_id=event_id) & Q(user_participant_id_id=user_id))
-            
             pprint(data)
         except Participant.DoesNotExist as e:
             return Response("DoesNotExist", status=status.HTTP_404_NOT_FOUND)
